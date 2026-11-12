@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NutriFuel Bar | BI Dashboard</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">N</span><div><strong>NutriFuel</strong><small>Bar intelligence</small></div></div>
+    <nav>
+      <button class="nav-link active" data-section="overview">Overview</button>
+      <button class="nav-link" data-section="sales">Sales analytics</button>
+      <button class="nav-link" data-section="quality">Data quality</button>
+    </nav>
+    <div class="sidebar-note">Synthetic sample data<br>For demonstration only</div>
+  </aside>
+  <main>
+    <header class="topbar"><div><p class="eyebrow">BUSINESS INTELLIGENCE</p><h1>NutriFuel Bar dashboard</h1><p class="muted">A clear view of your product and customer dimensions.</p></div><div class="date-filter"><label>Filter dates</label><div><input id="start" type="date"><span>to</span><input id="end" type="date"><button id="apply">Apply</button></div></div></header>
+    <section id="overview" class="page-section">
+      <div id="notice" class="notice"></div>
+      <div class="cards">
+        <article class="card"><span>Average listed price</span><strong id="catalog-value">—</strong><small>Available price observations</small></article>
+        <article class="card"><span>Customer accounts</span><strong id="customers">—</strong><small>Unique customer IDs</small></article>
+        <article class="card"><span>Product packs</span><strong id="packs">—</strong><small>Unique NutriFuel Bar SKUs</small></article>
+        <article class="card"><span>Data rows</span><strong id="rows">—</strong><small id="coverage">Loading...</small></article>
+      </div>
+      <div class="grid two"><article class="panel"><div class="panel-title"><h2>Customer segments</h2><span>Rows by segment</span></div><canvas id="segments"></canvas></article><article class="panel"><div class="panel-title"><h2>Sales channels</h2><span>Rows by channel</span></div><canvas id="channels"></canvas></article></div>
+      <div class="grid two"><article class="panel"><div class="panel-title"><h2>Product mix</h2><span>Available product dimensions</span></div><canvas id="products"></canvas></article><article class="panel insight"><div class="panel-title"><h2>Business readiness</h2><span>Important context</span></div><div class="readiness"><b>Dimension data available</b><p>Products, customer segments, channels, regions, states, and dates are available for exploration.</p><b>Measures pending</b><p>Revenue, units, orders, stock, and production fields are empty in the supplied dataset.</p></div></article></div>
+    </section>
+    <section id="sales" class="page-section hidden"><div class="section-heading"><div><p class="eyebrow">ANALYTICS</p><h2>Sales analytics</h2></div></div><div class="panel"><div class="panel-title"><h2>Sales data preview</h2><span>First 200 rows</span></div><div class="table-wrap"><table id="sales-table"></table></div></div></section>
+    <section id="quality" class="page-section hidden"><div class="section-heading"><div><p class="eyebrow">GOVERNANCE</p><h2>Data quality</h2></div></div><div class="panel"><div class="panel-title"><h2>Sales_Data quality summary</h2><span id="quality-count"></span></div><div class="table-wrap"><table id="quality-table"></table></div></div></section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
