@@ -30,7 +30,29 @@
           <article class="card"><span>Amount paid</span><strong id="user-amount-paid">—</strong><small>Total paid amount</small></article>
           <article class="card"><span>Payment pending</span><strong id="user-payment-pending">—</strong><small>Outstanding amount</small></article>
         </div>
+        <div class="panel"><div class="panel-title"><h2>Place an order</h2><span>New orders start as pending</span></div><form id="order-form" class="admin-form"><label>Product<select id="order-product" required><option value="">Loading products...</option></select></label><label>Quantity<input id="order-quantity" type="number" min="1" max="1000" value="1" required></label><button type="submit">Place order</button><p id="order-message" class="login-error"></p></form></div>
         <div class="panel"><div class="panel-title"><h2>My purchased items</h2><span id="user-data-scope"></span></div><div class="table-wrap"><table id="user-sales-table"></table></div></div>
+      </section>
+      <section id="admin-kpis">
+        <div class="section-heading"><div><p class="eyebrow">EXECUTIVE KPIs</p><h2>Business performance</h2><p class="muted">Financial, order, and fulfillment measures across all customer accounts.</p></div></div>
+        <div class="cards">
+          <article class="card"><span>Total revenue</span><strong id="admin-revenue">—</strong><small>Recorded sales revenue</small></article>
+          <article class="card"><span>Amount billed</span><strong id="admin-billed">—</strong><small>Total invoice value</small></article>
+          <article class="card"><span>Amount received</span><strong id="admin-paid">—</strong><small>Payments collected</small></article>
+          <article class="card"><span>Amount pending</span><strong id="admin-pending">—</strong><small>Outstanding payments</small></article>
+          <article class="card"><span>Total profit</span><strong id="admin-profit">—</strong><small>Estimated profit</small></article>
+          <article class="card"><span>Sales growth</span><strong id="admin-growth">—</strong><small>Last 30 days vs prior 30</small></article>
+          <article class="card"><span>Average order value</span><strong id="admin-aov">—</strong><small>Revenue per order</small></article>
+          <article class="card"><span>Units sold</span><strong id="admin-units">—</strong><small>Total units sold</small></article>
+          <article class="card"><span>Orders made</span><strong id="admin-orders">—</strong><small>Total unique orders</small></article>
+          <article class="card"><span>Orders delivered</span><strong id="admin-received">—</strong><small>Delivered or completed</small></article>
+          <article class="card"><span>Orders pending</span><strong id="admin-orders-pending">—</strong><small>Awaiting receipt</small></article>
+          <article class="card"><span>Customer accounts</span><strong id="admin-customers">—</strong><small>Unique customers</small></article>
+        </div>
+      </section>
+      <section id="admin-analytics" class="grid two">
+        <article class="panel"><div class="panel-title"><h2>Order status</h2><span>Unique orders by current status</span></div><div id="order-status-list" class="status-list"></div></article>
+        <article class="panel"><div class="panel-title"><h2>Stock alerts</h2><span>Products needing attention</span></div><div class="stock-summary"><div><strong id="stock-out">—</strong><span>Out of stock</span></div><div><strong id="stock-low">—</strong><span>Low stock</span></div><div><strong id="stock-total">—</strong><span>Units in stock</span></div></div><div id="stock-alert-list" class="stock-alert-list"></div></article>
       </section>
       <div class="cards">
         <article class="card"><span>Average listed price</span><strong id="catalog-value">—</strong><small>Available price observations</small></article>
@@ -57,6 +79,6 @@
     <section id="sales" class="page-section hidden"><div class="section-heading"><div><p class="eyebrow">ANALYTICS</p><h2>Sales analytics</h2></div></div><div class="panel"><div class="panel-title"><h2>Sales data preview</h2><span id="sales-access"></span></div><div class="table-wrap"><table id="sales-table"></table></div></div></section>
     <section id="quality" class="page-section hidden"><div class="section-heading"><div><p class="eyebrow">GOVERNANCE</p><h2>Data quality</h2></div></div><div class="panel"><div class="panel-title"><h2>Sales_Data quality summary</h2><span id="quality-count"></span></div><div class="table-wrap"><table id="quality-table"></table></div></div></section>
   </main>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20261114-3"></script>
 </body>
 </html>

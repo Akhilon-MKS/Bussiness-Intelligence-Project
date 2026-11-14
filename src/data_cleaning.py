@@ -23,7 +23,7 @@ def clean_dataframe(frame: pd.DataFrame) -> pd.DataFrame:
         df[column] = df[column].map(lambda value: value.strip() if isinstance(value, str) else value)
     for column in DATE_COLUMNS:
         if column in df.columns:
-            df[column] = pd.to_datetime(df[column], errors="coerce", dayfirst=True)
+            df[column] = pd.to_datetime(df[column], errors="coerce", format="mixed", dayfirst=True)
     for column in NUMERIC_COLUMNS:
         if column in df.columns:
             df[column] = pd.to_numeric(df[column], errors="coerce")

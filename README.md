@@ -80,7 +80,16 @@ authentication.
 
 ## KPI definitions
 
-Revenue is the sum of populated `revenue_inr`; units sold is the sum of `units_sold`; orders use distinct order identifiers; average order value is revenue divided by unique orders. The application avoids line-item order counting and duplicated joins. See `reports/business_insights.md` for the full data-quality findings and recommendations.
+Revenue is the sum of populated `revenue_inr`; profit is the sum of
+`estimated_profit_inr`; amount received and pending are based on the payment
+fields; units sold is the sum of `units_sold`; orders use distinct order
+identifiers; average order value is revenue divided by unique orders. Sales
+growth compares the latest 30 days with the preceding 30 days. Stock alerts
+use the latest available stock value per SKU, with zero as out of stock and
+20,000 or fewer units as low stock. Demo inventory is generated in quantities
+of thousands to reflect warehouse-scale stock levels. The application avoids line-item order
+counting and duplicated joins. See `reports/business_insights.md` for the
+full data-quality findings and recommendations.
 
 ## GitHub submission
 

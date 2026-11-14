@@ -58,6 +58,30 @@ async function loadDashboard() {
   $("user-payment-pending").textContent = money(data.metrics.payment_pending);
   $("user-dashboard-title").textContent = `${currentUser.username} account`;
   $("user-data-scope").textContent = `${currentUser.department} · ${currentUser.customer_id}`;
+  $("admin-revenue").textContent = money(data.metrics.revenue);
+  $("admin-billed").textContent = money(data.metrics.amount_billed);
+  $("admin-paid").textContent = money(data.metrics.amount_paid);
+  $("admin-pending").textContent = money(data.metrics.payment_pending);
+  $("admin-profit").textContent = money(data.metrics.profit);
+  $("admin-growth").textContent = data.metrics.sales_growth_pct == null ? "Not available" : `${data.metrics.sales_growth_pct >= 0 ? "+" : ""}${data.metrics.sales_growth_pct}%`;
+  $("admin-aov").textContent = money(data.metrics.average_order_value);
+  $("admin-units").textContent = data.metrics.units == null ? "Not available" : Number(data.metrics.units).toLocaleString("en-IN");
+  $("admin-orders").textContent = data.metrics.orders_made ?? "Not available";
+  $("admin-received").textContent = data.metrics.orders_delivered ?? data.metrics.orders_received ?? "Not available";
+  $("admin-orders-pending").textContent = data.metrics.orders_pending ?? "Not available";
+  $("admin-customers").textContent = data.customers ?? "Not available";
+  const statuses = rows("order_status");
+  const statusTotal = statuses.reduce((sum, item) => sum + Number(item.orders || 0), 0);
+  $("order-status-list").innerHTML = statuses.length
+    ? statuses.map(item => `<div class="status-row"><div><span class="status-pill">${item.order_status}</span><strong>${Number(item.orders).toLocaleString()}</strong></div><div class="status-bar"><i style="width:${statusTotal ? Math.max(2, Number(item.orders) / statusTotal * 100) : 0}%"></i></div></div>`).join("")
+    : "<p class='muted'>No order status data available.</p>";
+  const stock = data.stock_alerts || {};
+  $("stock-out").textContent = stock.out_of_stock ?? "—";
+  $("stock-low").textContent = stock.low_stock ?? "—";
+  $("stock-total").textContent = stock.units_in_stock ?? "—";
+  $("stock-alert-list").innerHTML = (stock.products || []).length
+    ? stock.products.map(item => `<div class="stock-row"><span>${item.product}<small>${item.sku}</small></span><strong>${Number(item.stock).toLocaleString()} left</strong></div>`).join("")
+    : "<p class='muted'>No low-stock products.</p>";
   const scope = currentUser.role === "admin"
     ? "all customer categories"
     : `${currentUser.department} category`;
@@ -97,6 +121,13 @@ function makeTable(id, rows) {
   }
 }
 async function loadSales() { const response = await fetch("/api/sales"); if (response.status === 401) { window.location.href = "/login"; return; } const data = await response.json(); $("sales-access").textContent = currentUser.role === "admin" ? "All categories" : `Customer: ${currentUser.customer_id}`; makeTable("sales-table", data.rows); }
+async function loadUserSales() { const response = await fetch("/api/sales"); if (response.ok) makeTable("user-sales-table", (await response.json()).rows); }
+async function loadOrderOptions() {
+  const response = await fetch("/api/order-options");
+  if (!response.ok) return;
+  const data = await response.json();
+  $("order-product").innerHTML = data.products.map(product => `<option value="${product.sku}">${product.product_name} · ${product.pack_type} · ${money(product.price_unit_inr)}</option>`).join("");
+}
 async function loadQuality() { const data = await fetch("/api/quality").then(r => r.json()); $("quality-count").textContent = `${data.sales.length} columns`; makeTable("quality-table", data.sales); }
 async function loadUsers() {
   const response = await fetch("/api/admin/users");
@@ -116,6 +147,8 @@ async function initialize() {
     $("dashboard-title").textContent = "NutriFuel Admin dashboard";
     $("dashboard-subtitle").textContent = "Full access to all customer accounts, analytics, data quality, and account management.";
   } else {
+    $("admin-kpis").classList.add("hidden");
+    $("admin-analytics").classList.add("hidden");
     document.querySelector(".date-filter").classList.add("hidden");
     document.querySelector('[data-section="sales"]').classList.add("hidden");
     document.querySelectorAll("#overview > .cards, #overview > .grid").forEach(element => element.classList.add("hidden"));
@@ -125,8 +158,8 @@ async function initialize() {
   }
   loadDashboard().then(async () => {
     if (currentUser.role !== "admin") {
-      const response = await fetch("/api/sales");
-      if (response.ok) makeTable("user-sales-table", (await response.json()).rows);
+      await loadOrderOptions();
+      await loadUserSales();
     }
   }).catch(error => { $("notice").textContent = `Could not load dashboard data: ${error.message}`; });
 }
@@ -140,3 +173,11 @@ if ($("user-form")) $("user-form").addEventListener("submit", async event => {
   if (response.ok) { event.target.reset(); await loadUsers(); }
 });
 initialize();
+if ($("order-form")) $("order-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const message = $("order-message");
+  const response = await fetch("/api/orders", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({sku: $("order-product").value, quantity: $("order-quantity").value})});
+  const data = await response.json().catch(() => ({}));
+  message.textContent = response.ok ? `Order ${data.order.order_id} placed and marked pending.` : (data.error || "Could not place order.");
+  if (response.ok) { $("order-quantity").value = 1; await loadDashboard(); await loadUserSales(); }
+});

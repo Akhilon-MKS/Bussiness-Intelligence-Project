@@ -30,6 +30,27 @@ def total_units_sold(frame: pd.DataFrame) -> Optional[float]:
     return metric_value(frame, "units_sold")
 
 
+def total_profit(frame: pd.DataFrame) -> Optional[float]:
+    return metric_value(frame, "estimated_profit_inr")
+
+
+def sales_growth(frame: pd.DataFrame, days: int = 30) -> Optional[float]:
+    if "date" not in frame.columns or "revenue_inr" not in frame.columns:
+        return None
+    dates = pd.to_datetime(frame["date"], errors="coerce")
+    revenue = pd.to_numeric(frame["revenue_inr"], errors="coerce")
+    latest = dates.max()
+    if pd.isna(latest):
+        return None
+    current_start = latest.normalize() - pd.Timedelta(days=days - 1)
+    previous_start = current_start - pd.Timedelta(days=days)
+    current = revenue[dates.between(current_start, latest)].sum(min_count=1)
+    previous = revenue[dates.between(previous_start, current_start - pd.Timedelta(days=1))].sum(min_count=1)
+    if pd.isna(current) or pd.isna(previous) or previous == 0:
+        return None
+    return round(float((current - previous) / previous * 100), 2)
+
+
 def total_orders(frame: pd.DataFrame) -> Optional[int]:
     for column in ("order_id", "order_number", "invoice_id"):
         if column in frame.columns and frame[column].notna().any():
@@ -37,8 +58,8 @@ def total_orders(frame: pd.DataFrame) -> Optional[int]:
     return None
 
 
-def orders_received(frame: pd.DataFrame) -> Optional[int]:
-    """Count received orders from an explicit received-order field or status."""
+def orders_delivered(frame: pd.DataFrame) -> Optional[int]:
+    """Count orders that have been delivered or completed."""
     for column in ("received_order_id", "received_order_number", "received_orders"):
         if column in frame.columns and frame[column].notna().any():
             return int(frame[column].nunique())
@@ -49,10 +70,15 @@ def orders_received(frame: pd.DataFrame) -> Optional[int]:
     if not order_column or "order_status" not in frame.columns:
         return None
     statuses = frame["order_status"].astype(str).str.strip().str.lower()
-    received = statuses.isin({"received", "delivered", "completed"})
-    if not received.any():
+    delivered = statuses.isin({"received", "delivered", "completed"})
+    if not delivered.any():
         return None
-    return int(frame.loc[received, order_column].nunique())
+    return int(frame.loc[delivered, order_column].nunique())
+
+
+def orders_received(frame: pd.DataFrame) -> Optional[int]:
+    """Backward-compatible alias for delivered-order counts."""
+    return orders_delivered(frame)
 
 
 def orders_pending(frame: pd.DataFrame) -> Optional[int]:

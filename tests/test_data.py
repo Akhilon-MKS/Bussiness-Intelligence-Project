@@ -95,3 +95,4 @@ def test_mock_sales_are_added_through_today():
     assert result["data_status"].dropna().eq("mocked").all()
     assert result["order_id"].notna().any()
     assert result["payment_pending_inr"].notna().any()
+    assert result["stock_available_units"].max() >= 1_000

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
+from threading import Lock
 
 import pandas as pd
 from bson import ObjectId
@@ -15,26 +17,52 @@ from src.analysis import (
     monthly_activity_forecast,
     dimension_performance,
     amount_paid,
-    orders_received,
+    metric_value,
+    orders_delivered,
     orders_pending,
     payment_pending,
     product_performance,
+    sales_growth,
+    total_profit,
     total_orders,
     total_revenue,
     total_units_sold,
 )
 from src.data_cleaning import clean_dataframe, data_quality_summary, duplicate_count
-from src.data_loader import MOCK_CUSTOMER_SEGMENTS, load_project_data
+from src.data_loader import MOCK_CUSTOMER_SEGMENTS, STOCK_LOW_THRESHOLD, load_project_data
 
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "frontend"
 app = Flask(__name__, static_folder=str(WEB), static_url_path="/static")
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-this-development-secret")
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 DEPARTMENTS = {"Healthcare B2B", "Distribution B2B", "Corporate B2B", "Consumer"}
+ORDER_STORE = ROOT / "mock_orders.json"
+ORDER_LOCK = Lock()
+
+
+def _load_local_orders() -> list[dict]:
+    if not ORDER_STORE.exists():
+        return []
+    with ORDER_STORE.open(encoding="utf-8") as file:
+        orders = json.load(file)
+    if not isinstance(orders, list) or not all(isinstance(order, dict) for order in orders):
+        raise RuntimeError("The local order store must contain a list of order records.")
+    return orders
+
+
+LOCAL_ORDERS = _load_local_orders()
 DEMO_USERS = {
     f"user{index}": customer_id
     for index, customer_id in enumerate(MOCK_CUSTOMER_SEGMENTS, start=1)
 }
+
+
+@app.after_request
+def disable_dashboard_caching(response):
+    if request.path.startswith("/api/") or request.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
 
 
 def _json_value(value):
@@ -111,6 +139,11 @@ def _require_admin(function):
 
 def _bundle():
     bundle = load_project_data()
+    with ORDER_LOCK:
+        if LOCAL_ORDERS:
+            _repair_local_orders(bundle.sales)
+            local_orders = pd.DataFrame(LOCAL_ORDERS).dropna(axis=1, how="all")
+            bundle.sales = pd.concat([local_orders, bundle.sales], ignore_index=True, sort=False)
     bundle.sales = clean_dataframe(bundle.sales)
     bundle.products = clean_dataframe(bundle.products)
     bundle.customers = clean_dataframe(bundle.customers)
@@ -129,6 +162,78 @@ def _bundle():
                 bundle.customers["customer_id"].isin(bundle.sales["customer_id"])
             ].copy()
     return bundle
+
+
+def _save_local_orders() -> None:
+    temporary = ORDER_STORE.with_suffix(".tmp")
+    with temporary.open("w", encoding="utf-8") as file:
+        json.dump(LOCAL_ORDERS, file, indent=2)
+    temporary.replace(ORDER_STORE)
+
+
+def _repair_local_orders(sales: pd.DataFrame) -> None:
+    changed = False
+    for order in LOCAL_ORDERS:
+        if "sku" not in order or "sku" not in sales.columns:
+            continue
+        matching = sales.loc[sales["sku"].eq(order["sku"])]
+        if "customer_id" in sales.columns and order.get("customer_id"):
+            customer_matching = matching.loc[matching["customer_id"].eq(order["customer_id"])]
+            if not customer_matching.empty:
+                matching = customer_matching
+        if matching.empty:
+            continue
+        source = matching.iloc[0].to_dict()
+        for key, value in source.items():
+            current = order.get(key)
+            missing = current is None or current == "" or (isinstance(current, float) and pd.isna(current))
+            if missing and key != "_record_id":
+                order[key] = _json_value(value)
+                changed = True
+    if changed:
+        _save_local_orders()
+
+
+def _order_status_summary(sales: pd.DataFrame) -> list[dict]:
+    if "order_status" not in sales.columns or "order_id" not in sales.columns:
+        return []
+    statuses = sales.assign(
+        order_status=sales["order_status"].fillna("Unknown").astype(str).str.strip().str.title()
+    ).loc[sales["order_id"].notna()]
+    summary = (
+        statuses.groupby("order_status")["order_id"]
+        .nunique()
+        .sort_values(ascending=False)
+        .rename("orders")
+        .reset_index()
+    )
+    return _records(summary)
+
+
+def _stock_alerts(sales: pd.DataFrame) -> dict:
+    required = {"sku", "stock_available_units"}
+    if not required.issubset(sales.columns):
+        return {"out_of_stock": 0, "low_stock": 0, "units_in_stock": None, "products": []}
+    working = sales.copy()
+    working["stock_available_units"] = pd.to_numeric(working["stock_available_units"], errors="coerce")
+    working = working.dropna(subset=["sku", "stock_available_units"])
+    if working.empty:
+        return {"out_of_stock": 0, "low_stock": 0, "units_in_stock": None, "products": []}
+    latest = (
+        working.sort_values("date" if "date" in working.columns else "sku")
+        .drop_duplicates("sku", keep="last")
+    )
+    latest["product"] = latest.get("product_name", latest["sku"]).fillna(latest["sku"]).astype(str)
+    latest["stock"] = latest["stock_available_units"].astype(float)
+    alerts = latest.loc[latest["stock"] <= STOCK_LOW_THRESHOLD].sort_values("stock")
+    return {
+        "out_of_stock": int((latest["stock"] <= 0).sum()),
+        "low_stock": int(
+            ((latest["stock"] > 0) & (latest["stock"] <= STOCK_LOW_THRESHOLD)).sum()
+        ),
+        "units_in_stock": int(latest["stock"].sum()),
+        "products": _records(alerts[["sku", "product", "stock"]].head(8)),
+    }
 
 
 @app.get("/")
@@ -249,9 +354,13 @@ def dashboard():
             "revenue": total_revenue(sales),
             "orders": total_orders(sales),
             "orders_made": total_orders(sales),
-            "orders_received": orders_received(sales),
+            "orders_delivered": orders_delivered(sales),
+            "orders_received": orders_delivered(sales),
             "orders_pending": orders_pending(sales),
             "amount_paid": amount_paid(sales),
+            "amount_billed": metric_value(sales, "invoice_amount_inr"),
+            "profit": total_profit(sales),
+            "sales_growth_pct": sales_growth(sales),
             "payment_pending": payment_pending(sales),
             "units": total_units_sold(sales),
             "average_order_value": average_order_value(sales),
@@ -265,6 +374,8 @@ def dashboard():
         "regions": _records(regions),
         "customer_types": _records(customer_types),
         "pack_types": _records(pack_types),
+        "order_status": _order_status_summary(sales),
+        "stock_alerts": _stock_alerts(sales),
     })
 
 
@@ -284,6 +395,76 @@ def quality():
 def sales():
     bundle = _bundle()
     return jsonify({"columns": list(bundle.sales.columns), "rows": _records(bundle.sales, 200)})
+
+
+@app.get("/api/order-options")
+@_require_login
+def order_options():
+    if _user().get("role") == "admin":
+        return jsonify({"error": "Only customer accounts can place orders."}), 403
+    bundle = _bundle()
+    columns = ["sku", "product_name", "pack_type", "price_unit_inr"]
+    available = [column for column in columns if column in bundle.sales.columns]
+    options = bundle.sales[available].dropna(subset=["sku"]).drop_duplicates("sku")
+    return jsonify({"products": _records(options.sort_values("sku"))})
+
+
+@app.post("/api/orders")
+@_require_login
+def create_order():
+    user = _user()
+    if user.get("role") == "admin":
+        return jsonify({"error": "Only customer accounts can place orders."}), 403
+    payload = request.get_json(silent=True) or {}
+    sku = str(payload.get("sku", "")).strip()
+    try:
+        quantity = int(payload.get("quantity", 0))
+    except (TypeError, ValueError):
+        quantity = 0
+    if not sku or quantity < 1 or quantity > 1000:
+        return jsonify({"error": "Choose a product and quantity between 1 and 1000."}), 400
+
+    bundle = _bundle()
+    if "sku" not in bundle.sales.columns:
+        return jsonify({"error": "No products are available for ordering."}), 503
+    matching = bundle.sales.loc[bundle.sales["sku"].eq(sku)]
+    if matching.empty:
+        return jsonify({"error": "That product is not available for your account."}), 400
+    product = matching.iloc[0]
+    price = pd.to_numeric(product.get("price_unit_inr"), errors="coerce")
+    if pd.isna(price):
+        return jsonify({"error": "The selected product has no valid price."}), 400
+
+    invoice = round(float(price) * quantity, 2)
+    today = pd.Timestamp.today().normalize()
+    with ORDER_LOCK:
+        order_id = f"USER-{today:%Y%m%d}-{len(LOCAL_ORDERS) + 1:05d}"
+        order = {
+            str(key): _json_value(value)
+            for key, value in product.to_dict().items()
+            if key != "_record_id"
+        }
+        order.update({
+            "date": today.strftime("%Y-%m-%d"),
+            "order_id": order_id,
+            "order_status": "Pending",
+            "customer_id": user["customer_id"],
+            "segment": user["department"],
+            "sku": sku,
+            "product_name": product.get("product_name"),
+            "pack_type": product.get("pack_type"),
+            "price_unit_inr": float(price),
+            "units_sold": quantity,
+            "delivered_units": 0,
+            "revenue_inr": invoice,
+            "invoice_amount_inr": invoice,
+            "amount_paid_inr": 0.0,
+            "payment_pending_inr": invoice,
+            "data_status": "user_order",
+        })
+        LOCAL_ORDERS.append(order)
+        _save_local_orders()
+    return jsonify({"created": True, "order": order}), 201
 
 
 @app.patch("/api/admin/sales/<record_id>")

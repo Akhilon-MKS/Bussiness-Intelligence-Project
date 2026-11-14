@@ -8,6 +8,7 @@ __pycache__/
 .env
 .env.*
 *.log
+mock_orders.json
 dist/
 build/
 *.egg-info/
