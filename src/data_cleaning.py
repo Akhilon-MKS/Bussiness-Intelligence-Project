@@ -10,7 +10,8 @@ NUMERIC_COLUMNS = (
     "price_unit_inr", "list_price_inr", "unit_cost_inr", "units_per_pack",
     "promotion", "delivery_days", "stock_available_units", "delivered_units",
     "units_sold", "revenue_inr", "estimated_cost_inr", "estimated_profit_inr",
-    "quantity", "production_quantity",
+    "quantity", "production_quantity", "invoice_amount_inr", "amount_paid_inr",
+    "payment_pending_inr",
 )
 
 

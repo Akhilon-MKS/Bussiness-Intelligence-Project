@@ -48,9 +48,22 @@ async function loadDashboard() {
   $("monthly-average").textContent = actualMonthlyValues.length
     ? Math.round(actualMonthlyValues.reduce((total, value) => total + value, 0) / actualMonthlyValues.length).toLocaleString()
     : "—";
+  $("orders-made").textContent = data.metrics.orders_made ?? "Not available";
+  $("orders-received").textContent = data.metrics.orders_received ?? "Not available";
+  $("payment-pending").textContent = money(data.metrics.payment_pending);
+  $("user-orders-made").textContent = data.metrics.orders_made ?? "Not available";
+  $("user-orders-received").textContent = data.metrics.orders_received ?? "Not available";
+  $("user-orders-pending").textContent = data.metrics.orders_pending ?? "Not available";
+  $("user-amount-paid").textContent = money(data.metrics.amount_paid);
+  $("user-payment-pending").textContent = money(data.metrics.payment_pending);
+  $("user-dashboard-title").textContent = `${currentUser.username} account`;
+  $("user-data-scope").textContent = `${currentUser.department} · ${currentUser.customer_id}`;
+  const scope = currentUser.role === "admin"
+    ? "all customer categories"
+    : `${currentUser.department} category`;
   $("notice").textContent = data.rows === 0
     ? "No rows match the selected date range. Choose dates between 2022-01-01 and 2024-12-31."
-    : `Showing ${currentUser.role === "admin" ? "all departments" : `your department: ${currentUser.department}`}. Revenue, units, order, inventory, and production measures are not populated.`;
+    : `Showing ${scope}. Items purchased, product categories, channels, regions, and customer IDs are restricted to this view.`;
   chart("segments", data.segments.map(x => x.segment), data.segments.map(x => x.rows), ["#164b36","#4f9270","#9bc28c","#d8f36a"]);
   const trendMetric = data.trend_metric || "record_activity";
   const performanceRows = productPerformance.length ? productPerformance : data.products.map(x => ({product: x.product, value: x.rows}));
@@ -70,7 +83,7 @@ function makeTable(id, rows) {
   const table = $(id); table.innerHTML = "";
   if (!rows.length) { table.innerHTML = "<tr><td class='empty'>No data available.</td></tr>"; return; }
   const columns = Object.keys(rows[0]);
-  const editable = id === "sales-table" && currentUser.role === "admin";
+  const editable = false;
   const escape = value => String(value ?? "—").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
   table.innerHTML = `<thead><tr>${columns.filter(x => x !== "_record_id").map(x => `<th>${x.replaceAll("_"," ")}</th>`).join("")}${editable ? "<th>Actions</th>" : ""}</tr></thead><tbody>${rows.map(row => `<tr data-record-id="${escape(row._record_id)}">${columns.filter(x => x !== "_record_id").map(x => `<td>${editable ? `<input class="edit-cell" data-field="${x}" value="${escape(row[x])}">` : escape(row[x])}</td>`).join("")}${editable ? "<td><button class='save-row'>Save</button></td>" : ""}</tr>`).join("")}</tbody>`;
   if (editable) {
@@ -83,7 +96,7 @@ function makeTable(id, rows) {
     }));
   }
 }
-async function loadSales() { const response = await fetch("/api/sales"); if (response.status === 401) { window.location.href = "/login"; return; } const data = await response.json(); $("sales-access").textContent = currentUser.role === "admin" ? "Admin view" : `Department: ${currentUser.department}`; makeTable("sales-table", data.rows); }
+async function loadSales() { const response = await fetch("/api/sales"); if (response.status === 401) { window.location.href = "/login"; return; } const data = await response.json(); $("sales-access").textContent = currentUser.role === "admin" ? "All categories" : `Customer: ${currentUser.customer_id}`; makeTable("sales-table", data.rows); }
 async function loadQuality() { const data = await fetch("/api/quality").then(r => r.json()); $("quality-count").textContent = `${data.sales.length} columns`; makeTable("quality-table", data.sales); }
 async function loadUsers() {
   const response = await fetch("/api/admin/users");
@@ -101,18 +114,27 @@ async function initialize() {
   if (currentUser.role === "admin") {
     document.querySelectorAll(".admin-only").forEach(element => element.classList.remove("hidden"));
     $("dashboard-title").textContent = "NutriFuel Admin dashboard";
-    $("dashboard-subtitle").textContent = "Full access to all departments, analytics, data quality, and account management.";
+    $("dashboard-subtitle").textContent = "Full access to all customer accounts, analytics, data quality, and account management.";
   } else {
+    document.querySelector(".date-filter").classList.add("hidden");
+    document.querySelector('[data-section="sales"]').classList.add("hidden");
+    document.querySelectorAll("#overview > .cards, #overview > .grid").forEach(element => element.classList.add("hidden"));
+    $("user-dashboard").classList.remove("hidden");
     $("dashboard-title").textContent = `${currentUser.department} dashboard`;
-    $("dashboard-subtitle").textContent = "Department analytics and charts. Data is read-only.";
+    $("dashboard-subtitle").textContent = "Personal order and payment summary. Data is read-only.";
   }
-  loadDashboard().catch(error => { $("notice").textContent = `Could not load dashboard data: ${error.message}`; });
+  loadDashboard().then(async () => {
+    if (currentUser.role !== "admin") {
+      const response = await fetch("/api/sales");
+      if (response.ok) makeTable("user-sales-table", (await response.json()).rows);
+    }
+  }).catch(error => { $("notice").textContent = `Could not load dashboard data: ${error.message}`; });
 }
 $("logout").addEventListener("click", async () => { await fetch("/api/logout", {method: "POST"}); window.location.href = "/login"; });
 if ($("user-form")) $("user-form").addEventListener("submit", async event => {
   event.preventDefault();
   const message = $("user-message");
-  const response = await fetch("/api/admin/users", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username: $("new-username").value, password: $("new-password").value, department: $("new-department").value})});
+  const response = await fetch("/api/admin/users", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username: $("new-username").value, password: $("new-password").value, customer_id: $("new-customer-id").value, department: $("new-department").value})});
   const data = await response.json();
   message.textContent = response.ok ? `Created ${data.username}.` : (data.error || "Could not create user.");
   if (response.ok) { event.target.reset(); await loadUsers(); }

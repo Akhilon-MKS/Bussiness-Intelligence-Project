@@ -37,6 +37,68 @@ def total_orders(frame: pd.DataFrame) -> Optional[int]:
     return None
 
 
+def orders_received(frame: pd.DataFrame) -> Optional[int]:
+    """Count received orders from an explicit received-order field or status."""
+    for column in ("received_order_id", "received_order_number", "received_orders"):
+        if column in frame.columns and frame[column].notna().any():
+            return int(frame[column].nunique())
+    order_column = next(
+        (column for column in ("order_id", "order_number", "invoice_id") if column in frame.columns),
+        None,
+    )
+    if not order_column or "order_status" not in frame.columns:
+        return None
+    statuses = frame["order_status"].astype(str).str.strip().str.lower()
+    received = statuses.isin({"received", "delivered", "completed"})
+    if not received.any():
+        return None
+    return int(frame.loc[received, order_column].nunique())
+
+
+def orders_pending(frame: pd.DataFrame) -> Optional[int]:
+    order_column = next(
+        (column for column in ("order_id", "order_number", "invoice_id") if column in frame.columns),
+        None,
+    )
+    if not order_column or "order_status" not in frame.columns:
+        return None
+    pending = frame["order_status"].astype(str).str.strip().str.lower().eq("pending")
+    return int(frame.loc[pending, order_column].nunique()) if pending.any() else 0
+
+
+def amount_paid(frame: pd.DataFrame) -> Optional[float]:
+    for column in ("amount_paid_inr", "paid_amount_inr", "payment_received_inr"):
+        value = metric_value(frame, column)
+        if value is not None:
+            return value
+    return None
+
+
+def payment_pending(frame: pd.DataFrame) -> Optional[float]:
+    """Sum an explicit pending-payment field, or derive it from due and paid amounts."""
+    for column in (
+        "payment_pending_inr",
+        "pending_payment_inr",
+        "amount_pending_inr",
+        "payment_due_inr",
+        "pending_amount_inr",
+    ):
+        value = metric_value(frame, column)
+        if value is not None:
+            return value
+    due = next(
+        (metric_value(frame, column) for column in ("invoice_amount_inr", "amount_due_inr", "total_amount_inr")
+         if metric_value(frame, column) is not None),
+        None,
+    )
+    paid = next(
+        (metric_value(frame, column) for column in ("amount_paid_inr", "paid_amount_inr", "payment_received_inr")
+         if metric_value(frame, column) is not None),
+        None,
+    )
+    return max(0.0, due - paid) if due is not None and paid is not None else None
+
+
 def average_order_value(frame: pd.DataFrame) -> Optional[float]:
     revenue = total_revenue(frame)
     orders = total_orders(frame)

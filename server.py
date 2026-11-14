@@ -14,25 +14,26 @@ from src.analysis import (
     average_order_value,
     monthly_activity_forecast,
     dimension_performance,
+    amount_paid,
+    orders_received,
+    orders_pending,
+    payment_pending,
     product_performance,
     total_orders,
     total_revenue,
     total_units_sold,
 )
 from src.data_cleaning import clean_dataframe, data_quality_summary, duplicate_count
-from src.data_loader import load_project_data
+from src.data_loader import MOCK_CUSTOMER_SEGMENTS, load_project_data
 
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "frontend"
 app = Flask(__name__, static_folder=str(WEB), static_url_path="/static")
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-this-development-secret")
 DEPARTMENTS = {"Healthcare B2B", "Distribution B2B", "Corporate B2B", "Consumer"}
-DEMO_ROLES = {
-    "admin": None,
-    "healthcare": "Healthcare B2B",
-    "distribution": "Distribution B2B",
-    "corporate": "Corporate B2B",
-    "consumer": "Consumer",
+DEMO_USERS = {
+    f"user{index}": customer_id
+    for index, customer_id in enumerate(MOCK_CUSTOMER_SEGMENTS, start=1)
 }
 
 
@@ -115,11 +116,12 @@ def _bundle():
     bundle.customers = clean_dataframe(bundle.customers)
     user = _user()
     if user and user.get("role") != "admin":
-        if not user.get("department"):
-            raise RuntimeError("This user has no department assigned.")
-        if "segment" not in bundle.sales.columns:
-            raise RuntimeError("Sales data has no segment field for department filtering.")
-        bundle.sales = bundle.sales.loc[bundle.sales["segment"] == user["department"]].copy()
+        if user.get("customer_id") and "customer_id" in bundle.sales.columns:
+            bundle.sales = bundle.sales.loc[bundle.sales["customer_id"] == user["customer_id"]].copy()
+        elif user.get("department") and "segment" in bundle.sales.columns:
+            bundle.sales = bundle.sales.loc[bundle.sales["segment"] == user["department"]].copy()
+        else:
+            raise RuntimeError("This user has no valid data scope assigned.")
         if "sku" in bundle.products.columns and "sku" in bundle.sales.columns:
             bundle.products = bundle.products.loc[bundle.products["sku"].isin(bundle.sales["sku"])].copy()
         if "customer_id" in bundle.customers.columns and "customer_id" in bundle.sales.columns:
@@ -175,6 +177,7 @@ def login():
         "username": account["username"],
         "role": account["role"],
         "department": account.get("department"),
+        "customer_id": account.get("customer_id"),
     }
     return jsonify(session["user"])
 
@@ -182,13 +185,22 @@ def login():
 @app.post("/api/demo-login")
 def demo_login():
     payload = request.get_json(silent=True) or {}
-    role = str(payload.get("role", "")).strip()
-    if role not in DEMO_ROLES:
-        return jsonify({"error": "Select a dashboard role."}), 400
+    username = str(payload.get("username", "")).strip().lower()
+    if username == "admin":
+        role = "admin"
+        department = None
+        customer_id = None
+    elif username in DEMO_USERS:
+        role = "user"
+        customer_id = DEMO_USERS[username]
+        department = MOCK_CUSTOMER_SEGMENTS[customer_id]
+    else:
+        return jsonify({"error": "Use admin or user1 through user6."}), 400
     session["user"] = {
-        "username": f"Demo {role.title()}",
-        "role": "admin" if role == "admin" else "user",
-        "department": DEMO_ROLES[role],
+        "username": username,
+        "role": role,
+        "department": department,
+        "customer_id": customer_id,
     }
     return jsonify(session["user"])
 
@@ -236,6 +248,11 @@ def dashboard():
         "metrics": {
             "revenue": total_revenue(sales),
             "orders": total_orders(sales),
+            "orders_made": total_orders(sales),
+            "orders_received": orders_received(sales),
+            "orders_pending": orders_pending(sales),
+            "amount_paid": amount_paid(sales),
+            "payment_pending": payment_pending(sales),
             "units": total_units_sold(sales),
             "average_order_value": average_order_value(sales),
         },
@@ -263,7 +280,7 @@ def quality():
 
 
 @app.get("/api/sales")
-@_require_admin
+@_require_login
 def sales():
     bundle = _bundle()
     return jsonify({"columns": list(bundle.sales.columns), "rows": _records(bundle.sales, 200)})
@@ -301,8 +318,9 @@ def create_user():
     username = str(payload.get("username", "")).strip()
     password = str(payload.get("password", ""))
     department = str(payload.get("department", "")).strip()
-    if not username or not password or not department:
-        return jsonify({"error": "Username, password, and department are required."}), 400
+    customer_id = str(payload.get("customer_id", "")).strip()
+    if not username or not password or not department or not customer_id:
+        return jsonify({"error": "Username, password, department, and customer ID are required."}), 400
     if department not in DEPARTMENTS:
         return jsonify({"error": "Invalid department."}), 400
     client, database = _database_client()
@@ -314,11 +332,17 @@ def create_user():
             "password_hash": generate_password_hash(password),
             "role": "user",
             "department": department,
+            "customer_id": customer_id,
             "active": True,
         })
     finally:
         client.close()
-    return jsonify({"created": True, "username": username, "department": department}), 201
+    return jsonify({
+        "created": True,
+        "username": username,
+        "department": department,
+        "customer_id": customer_id,
+    }), 201
 
 
 @app.get("/api/admin/users")
@@ -328,7 +352,7 @@ def list_users():
     try:
         accounts = database.users.find(
             {},
-            {"_id": 0, "username": 1, "role": 1, "department": 1, "active": 1},
+            {"_id": 0, "username": 1, "role": 1, "department": 1, "customer_id": 1, "active": 1},
         ).sort("username", 1)
         return jsonify({"users": list(accounts)})
     finally:

@@ -12,9 +12,8 @@
     <div class="brand"><span class="brand-mark">N</span><div><strong>NutriFuel</strong><small>Bar intelligence</small></div></div>
     <nav>
       <button class="nav-link active" data-section="overview">Overview</button>
-      <button class="nav-link admin-only hidden" data-section="sales">Sales analytics</button>
+      <button class="nav-link" data-section="sales">Sales analytics</button>
       <button class="nav-link admin-only hidden" data-section="quality">Data quality</button>
-      <button class="nav-link admin-only hidden" data-section="admin-users">User accounts</button>
     </nav>
     <div class="sidebar-note"><span id="user-name"></span><br><button id="logout" class="logout">Sign out</button></div>
   </aside>
@@ -22,6 +21,17 @@
     <header class="topbar"><div><p class="eyebrow">BUSINESS INTELLIGENCE</p><h1 id="dashboard-title">NutriFuel Bar dashboard</h1><p id="dashboard-subtitle" class="muted">A clear view of your product and customer dimensions.</p></div><div class="date-filter"><label>Filter dates</label><div><input id="start" type="date"><span>to</span><input id="end" type="date"><button id="apply">Apply</button></div></div></header>
     <section id="overview" class="page-section">
       <div id="notice" class="notice"></div>
+      <section id="user-dashboard" class="hidden">
+        <div class="section-heading"><div><p class="eyebrow">PERSONAL ACCOUNT</p><h2 id="user-dashboard-title">Your account</h2><p class="muted">Only your customer data is shown.</p></div></div>
+        <div class="cards">
+          <article class="card"><span>Orders made</span><strong id="user-orders-made">—</strong><small>Total orders for your account</small></article>
+          <article class="card"><span>Orders received</span><strong id="user-orders-received">—</strong><small>Received or delivered orders</small></article>
+          <article class="card"><span>Orders pending</span><strong id="user-orders-pending">—</strong><small>Orders not yet received</small></article>
+          <article class="card"><span>Amount paid</span><strong id="user-amount-paid">—</strong><small>Total paid amount</small></article>
+          <article class="card"><span>Payment pending</span><strong id="user-payment-pending">—</strong><small>Outstanding amount</small></article>
+        </div>
+        <div class="panel"><div class="panel-title"><h2>My purchased items</h2><span id="user-data-scope"></span></div><div class="table-wrap"><table id="user-sales-table"></table></div></div>
+      </section>
       <div class="cards">
         <article class="card"><span>Average listed price</span><strong id="catalog-value">—</strong><small>Available price observations</small></article>
         <article class="card"><span>Customer accounts</span><strong id="customers">—</strong><small>Unique customer IDs</small></article>
@@ -34,6 +44,11 @@
         <article class="card"><span>Top customer type</span><strong id="top-customer-type">—</strong><small>Highest activity channel</small></article>
         <article class="card"><span>Average monthly activity</span><strong id="monthly-average">—</strong><small>Record-count proxy</small></article>
       </div>
+      <div class="cards secondary-cards">
+        <article class="card"><span>Orders made</span><strong id="orders-made">—</strong><small>Orders in your account</small></article>
+        <article class="card"><span>Orders received</span><strong id="orders-received">—</strong><small>Received or delivered orders</small></article>
+        <article class="card"><span>Payment pending</span><strong id="payment-pending">—</strong><small>Available pending amount</small></article>
+      </div>
       <div class="grid two"><article class="panel"><div class="panel-title"><h2>Customer segments</h2><span>Rows by segment</span></div><canvas id="segments"></canvas></article><article class="panel insight"><div class="panel-title"><h2>Business readiness</h2><span>Important context</span></div><div class="readiness"><b>Dimension data available</b><p>Products, customer segments, regions, states, dates, and pack types are available for exploration.</p><b>Measures pending</b><p>Revenue, units, orders, stock, and production fields are empty in the supplied dataset.</p><b>Access control</b><p>Your dashboard is restricted to the department assigned to your account.</p></div></article></div>
       <div class="grid two"><article class="panel"><div class="panel-title"><h2>Product performance</h2><span id="product-performance-label">Records by product</span></div><canvas id="product-performance"></canvas></article><article class="panel"><div class="panel-title"><h2>Sales outlook</h2><span id="trend-label">Monthly activity projection</span></div><canvas id="sales-trend"></canvas></article></div>
       <div class="grid two"><article class="panel"><div class="panel-title"><h2>Monthly revenue trend</h2><span id="revenue-trend-label">Sales measure or activity proxy</span></div><canvas id="revenue-trend"></canvas></article><article class="panel"><div class="panel-title"><h2>Sales by region</h2><span>Regional performance</span></div><canvas id="regions"></canvas></article></div>
@@ -41,7 +56,6 @@
     </section>
     <section id="sales" class="page-section hidden"><div class="section-heading"><div><p class="eyebrow">ANALYTICS</p><h2>Sales analytics</h2></div></div><div class="panel"><div class="panel-title"><h2>Sales data preview</h2><span id="sales-access"></span></div><div class="table-wrap"><table id="sales-table"></table></div></div></section>
     <section id="quality" class="page-section hidden"><div class="section-heading"><div><p class="eyebrow">GOVERNANCE</p><h2>Data quality</h2></div></div><div class="panel"><div class="panel-title"><h2>Sales_Data quality summary</h2><span id="quality-count"></span></div><div class="table-wrap"><table id="quality-table"></table></div></div></section>
-    <section id="admin-users" class="page-section hidden"><div class="section-heading"><div><p class="eyebrow">ADMINISTRATION</p><h2>User accounts</h2><p class="muted">Create department accounts. Each user can only view data for the assigned department.</p></div></div><div class="grid two"><div class="panel"><div class="panel-title"><h2>Create user login</h2></div><form id="user-form" class="admin-form"><label>Username<input id="new-username" required autocomplete="off"></label><label>Temporary password<input id="new-password" type="password" required autocomplete="new-password"></label><label>Department<select id="new-department" required><option value="">Select department</option><option>Healthcare B2B</option><option>Distribution B2B</option><option>Corporate B2B</option><option>Consumer</option></select></label><button type="submit">Create user</button><p id="user-message" class="login-error"></p></form></div><div class="panel"><div class="panel-title"><h2>Existing accounts</h2></div><div class="table-wrap"><table id="users-table"></table></div></div></div></section>
   </main>
   <script src="/static/app.js"></script>
 </body>

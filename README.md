@@ -29,29 +29,11 @@ tests/test_data.py
 
 `NutriFuel_Bar_BI_Dataset.xlsx` contains `README`, `Products`, `Customers`, and `Sales_Data`. `NutriFuel_Sales_Data.csv` is a matching flat export. The workbook README mentions Orders, Production_Data, and Inventory_Snapshots, but those sheets are absent. The dataset is not empty: it contains 65,760 dated rows, 50 customer accounts, 3 product packs, channels, regions, states, and 63,323 populated price observations. However, sales measures such as `units_sold` and `revenue_inr` are empty, so revenue, orders, stock, production, and profitability KPIs cannot be calculated yet.
 
-## MongoDB Atlas setup
+## Data source
 
-The dashboard reads sales, products, and customers from MongoDB Atlas. It does not load
-the CSV or Excel files at runtime. Set these environment variables in PowerShell:
-
-```powershell
-$env:MONGODB_URI = "mongodb+srv://akhilon24ad_db_user:<password>@nutrifuel-cluster.opihgfa.mongodb.net/nutrifuel?retryWrites=true&w=majority"
-$env:MONGODB_DATABASE = "nutrifuel"
-```
-
-Replace `<password>` locally with the rotated database-user password. Do not commit
-the URI or password.
-
-Install dependencies and import the existing data once:
-
-```powershell
-pip install -r requirements.txt
-python scripts/import_to_mongodb.py
-```
-
-The import replaces the contents of the `sales`, `products`, and `customers`
-collections. After verifying the dashboard, the local CSV and Excel files can be
-removed from the project folder.
+The dashboard uses `NutriFuel_Bar_BI_Dataset.xlsx` locally and does not require
+MongoDB for the demo. MongoDB support remains available only when
+`USE_MONGODB=true` is explicitly configured.
 
 ## Windows PowerShell setup
 
@@ -76,57 +58,25 @@ Open `http://127.0.0.1:5050` in your browser. The separate frontend has Overview
 
 ## Dashboard access
 
-For the local demonstration, the login page provides five role buttons:
-Admin, Healthcare B2B, Distribution B2B, Corporate B2B, and Consumer. No
-credentials are required after selecting a role. This role selector is for
-demonstration only and must not be used as production authentication.
-
-The application has two role-based dashboards:
-
-- `/admin`: administrator view of all departments, with sales-record editing.
-- `/`: user view, filtered server-side to the user's assigned `segment`.
-
-Set the first administrator before starting the server:
+For the local demonstration, start the server without MongoDB:
 
 ```powershell
 $env:FLASK_SECRET_KEY = "use-a-long-random-value"
-$env:ADMIN_USERNAME = "admin"
-$env:ADMIN_PASSWORD = "use-a-strong-password"
 python server.py
 ```
 
-The administrator account is created in the `users` collection on first startup.
-If you change `ADMIN_USERNAME` or `ADMIN_PASSWORD`, restart the server; the
-configured administrator account is synchronized on the next sign-in.
-After signing in at `/admin`, open **User accounts** in the sidebar to create
-department users. Each user sees only sales rows for the assigned department;
-related products, customers, and data-quality results are scoped to those rows.
-Administrators see all departments and can edit sales records. The same user
-creation action is also available through the API:
+The sign-in page provides seven local accounts: `admin`, `user1`, `user2`,
+`user3`, `user4`, `user5`, and `user6`. Any non-empty password is accepted for
+the demo accounts. Admin sees every category. Each user has a distinct customer
+ID and is filtered server-side to only that customer's purchased items,
+orders, received orders, pending orders, paid amount, pending payment,
+products, channels, regions, states, and pack types. This is a demonstration
+login and does not provide production authentication.
 
-```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:5050/api/admin/users" -Method Post `
-  -ContentType "application/json" `
-  -Body '{"username":"health-user","password":"strong-password","department":"Healthcare B2B"}'
-```
-
-PowerShell requests do not automatically share the browser's login session.
-Use the browser while signed in as admin to create users, or create a PowerShell
-session and log in first:
-
-```powershell
-$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-Invoke-RestMethod -Uri "http://127.0.0.1:5050/api/login" -Method Post `
-  -WebSession $session -ContentType "application/json" `
-  -Body '{"username":"admin","password":"your-admin-password"}'
-Invoke-RestMethod -Uri "http://127.0.0.1:5050/api/admin/users" -Method Post `
-  -WebSession $session -ContentType "application/json" `
-  -Body '{"username":"health-user","password":"strong-password","department":"Healthcare B2B"}'
-```
-
-Valid departments are `Healthcare B2B`, `Distribution B2B`, `Corporate B2B`,
-and `Consumer`. Keep the connection string, passwords, and Flask secret in
-environment variables; never commit them.
+User views show items purchased, product categories, channels, regions, states,
+pack types, and customer IDs for their assigned category. Admin sees all data.
+The role selector is for demonstration only and does not provide production
+authentication.
 
 ## KPI definitions
 

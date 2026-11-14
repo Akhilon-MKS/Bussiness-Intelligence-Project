@@ -1,9 +1,14 @@
 import pandas as pd
 
+from src.data_loader import _mock_sales_until_today
 from src.analysis import (
     average_order_value,
+    amount_paid,
     filter_by_date,
     monthly_activity_forecast,
+    orders_received,
+    orders_pending,
+    payment_pending,
     product_performance,
     total_orders,
     total_revenue,
@@ -27,6 +32,19 @@ def test_revenue_and_unique_orders():
 def test_empty_measure_returns_none():
     assert total_revenue(pd.DataFrame({"revenue_inr": [None]})) is None
     assert total_orders(pd.DataFrame({"revenue_inr": [1]})) is None
+
+
+def test_order_and_payment_account_metrics():
+    data = pd.DataFrame({
+        "order_id": ["A", "A", "B"],
+        "order_status": ["Delivered", "Delivered", "Pending"],
+        "invoice_amount_inr": [100, 50, 80],
+        "amount_paid_inr": [100, 50, 20],
+    })
+    assert orders_received(data) == 1
+    assert payment_pending(data) == 60
+    assert amount_paid(data) == 170
+    assert orders_pending(data) == 1
 
 
 def test_date_filtering():
@@ -61,3 +79,19 @@ def test_monthly_activity_forecast_returns_actual_and_projection():
     assert metric == "record_activity"
     assert result["actual"].notna().sum() == 2
     assert result["predicted"].notna().sum() == 1
+
+
+def test_mock_sales_are_added_through_today():
+    source = pd.DataFrame({
+        "date": ["2024-12-31"],
+        "segment": ["Consumer"],
+        "pack_type": ["Single Bar"],
+        "price_unit_inr": [40],
+        "sku": ["NF-SINGLE"],
+    })
+    result = _mock_sales_until_today(source)
+    assert len(result) > len(source)
+    assert result["date"].max() == pd.Timestamp.today().normalize()
+    assert result["data_status"].dropna().eq("mocked").all()
+    assert result["order_id"].notna().any()
+    assert result["payment_pending_inr"].notna().any()
