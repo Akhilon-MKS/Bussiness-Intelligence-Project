@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NutriFuel | Sign in</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="login-page">
+  <main class="login-card">
+    <div class="brand"><span class="brand-mark">N</span><div><strong>NutriFuel</strong><small>Bar intelligence</small></div></div>
+    <h1>Sign in</h1>
+    <p class="muted">Choose a dashboard role to enter the showcase.</p>
+    <form id="login-form">
+      <div class="role-buttons" role="group" aria-label="Dashboard role">
+        <button type="button" class="role-button selected" data-role="admin">Admin</button>
+        <button type="button" class="role-button" data-role="healthcare">Healthcare B2B</button>
+        <button type="button" class="role-button" data-role="distribution">Distribution B2B</button>
+        <button type="button" class="role-button" data-role="corporate">Corporate B2B</button>
+        <button type="button" class="role-button" data-role="consumer">Consumer</button>
+      </div>
+      <button type="submit">Sign in</button>
+      <p id="login-error" class="login-error"></p>
+    </form>
+  </main>
+  <script>
+    let selectedRole = "admin";
+    document.querySelectorAll(".role-button").forEach((button) => button.addEventListener("click", () => {
+      document.querySelectorAll(".role-button").forEach((item) => item.classList.remove("selected"));
+      button.classList.add("selected");
+      selectedRole = button.dataset.role;
+    }));
+    document.getElementById("login-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      let response;
+      try {
+        response = await fetch("/api/demo-login", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({role: selectedRole})});
+      } catch (error) {
+        document.getElementById("login-error").textContent = "Cannot connect to the server. Restart python server.py.";
+        return;
+      }
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) { document.getElementById("login-error").textContent = data.error || `Sign in failed (HTTP ${response.status}).`; return; }
+      window.location.href = data.role === "admin" ? "/admin" : "/";
+    });
+  </script>
+</body>
+</html>

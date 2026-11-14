@@ -1,6 +1,6 @@
 # NutriFuel Bar Business Intelligence and Sales Analytics Dashboard
 
-This project is a beginner-friendly Python and Streamlit dashboard for exploring NutriFuel Bar business dimensions across B2B and B2C channels. **The supplied files contain synthetic sample data, not actual business transactions.** The dashboard never invents missing measures; unsupported KPIs show a clear availability message.
+This project is a Python and Flask dashboard for exploring NutriFuel Bar business dimensions across B2B and B2C channels. The dashboard never invents missing measures; unsupported KPIs show a clear availability message.
 
 ## Business problem and objectives
 
@@ -73,6 +73,60 @@ pytest -q
 ```
 
 Open `http://127.0.0.1:5050` in your browser. The separate frontend has Overview, Sales Analytics, and Data Quality sections. It uses a Flask JSON API and Chart.js; it does not use Streamlit. Date filters update the dashboard data request.
+
+## Dashboard access
+
+For the local demonstration, the login page provides five role buttons:
+Admin, Healthcare B2B, Distribution B2B, Corporate B2B, and Consumer. No
+credentials are required after selecting a role. This role selector is for
+demonstration only and must not be used as production authentication.
+
+The application has two role-based dashboards:
+
+- `/admin`: administrator view of all departments, with sales-record editing.
+- `/`: user view, filtered server-side to the user's assigned `segment`.
+
+Set the first administrator before starting the server:
+
+```powershell
+$env:FLASK_SECRET_KEY = "use-a-long-random-value"
+$env:ADMIN_USERNAME = "admin"
+$env:ADMIN_PASSWORD = "use-a-strong-password"
+python server.py
+```
+
+The administrator account is created in the `users` collection on first startup.
+If you change `ADMIN_USERNAME` or `ADMIN_PASSWORD`, restart the server; the
+configured administrator account is synchronized on the next sign-in.
+After signing in at `/admin`, open **User accounts** in the sidebar to create
+department users. Each user sees only sales rows for the assigned department;
+related products, customers, and data-quality results are scoped to those rows.
+Administrators see all departments and can edit sales records. The same user
+creation action is also available through the API:
+
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:5050/api/admin/users" -Method Post `
+  -ContentType "application/json" `
+  -Body '{"username":"health-user","password":"strong-password","department":"Healthcare B2B"}'
+```
+
+PowerShell requests do not automatically share the browser's login session.
+Use the browser while signed in as admin to create users, or create a PowerShell
+session and log in first:
+
+```powershell
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+Invoke-RestMethod -Uri "http://127.0.0.1:5050/api/login" -Method Post `
+  -WebSession $session -ContentType "application/json" `
+  -Body '{"username":"admin","password":"your-admin-password"}'
+Invoke-RestMethod -Uri "http://127.0.0.1:5050/api/admin/users" -Method Post `
+  -WebSession $session -ContentType "application/json" `
+  -Body '{"username":"health-user","password":"strong-password","department":"Healthcare B2B"}'
+```
+
+Valid departments are `Healthcare B2B`, `Distribution B2B`, `Corporate B2B`,
+and `Consumer`. Keep the connection string, passwords, and Flask secret in
+environment variables; never commit them.
 
 ## KPI definitions
 

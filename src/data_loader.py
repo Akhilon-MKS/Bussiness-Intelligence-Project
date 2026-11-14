@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -20,17 +21,40 @@ class DataBundle:
 
 
 def _collection_frame(database, collection_name: str) -> pd.DataFrame:
-    records = list(database[collection_name].find({}, {"_id": False}))
+    records = list(database[collection_name].find({}))
+    for record in records:
+        record["_record_id"] = str(record.pop("_id"))
     return pd.DataFrame(records)
 
 
+def _load_local_data(root: Path) -> DataBundle:
+    workbook = root / "NutriFuel_Bar_BI_Dataset.xlsx"
+    csv_file = root / "NutriFuel_Sales_Data.csv"
+    if workbook.exists():
+        excel = pd.ExcelFile(workbook)
+        return DataBundle(
+            sales=pd.read_excel(workbook, sheet_name="Sales_Data") if "Sales_Data" in excel.sheet_names else pd.DataFrame(),
+            products=pd.read_excel(workbook, sheet_name="Products") if "Products" in excel.sheet_names else pd.DataFrame(),
+            customers=pd.read_excel(workbook, sheet_name="Customers") if "Customers" in excel.sheet_names else pd.DataFrame(),
+            source=f"Local workbook: {workbook.name}",
+            available_sheets=excel.sheet_names,
+        )
+    if csv_file.exists():
+        return DataBundle(
+            sales=pd.read_csv(csv_file, low_memory=False),
+            source=f"Local CSV: {csv_file.name}",
+            available_sheets=["sales"],
+        )
+    raise RuntimeError("No MongoDB connection or local dataset was found.")
+
+
 def load_project_data() -> DataBundle:
-    """Load all dashboard datasets from MongoDB Atlas."""
+    """Load dashboard datasets from MongoDB Atlas or local project files."""
     import os
 
     uri = os.environ.get("MONGODB_URI")
     if not uri:
-        raise RuntimeError("MONGODB_URI is not configured.")
+        return _load_local_data(Path(__file__).resolve().parents[1])
 
     database_name = os.environ.get("MONGODB_DATABASE", "nutrifuel")
     client = MongoClient(uri, serverSelectionTimeoutMS=5000)

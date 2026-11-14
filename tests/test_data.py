@@ -1,6 +1,13 @@
 import pandas as pd
 
-from src.analysis import average_order_value, filter_by_date, total_orders, total_revenue
+from src.analysis import (
+    average_order_value,
+    filter_by_date,
+    monthly_activity_forecast,
+    product_performance,
+    total_orders,
+    total_revenue,
+)
 from src.data_cleaning import clean_dataframe, data_quality_summary, validate_required_columns
 
 
@@ -32,3 +39,25 @@ def test_quality_and_required_columns():
     quality = data_quality_summary(data)
     assert quality.loc[quality["column"] == "a", "missing"].item() == 1
     assert validate_required_columns(data, ["a", "missing"]) == ["missing"]
+
+
+def test_product_performance_uses_records_when_sales_measures_are_empty():
+    data = pd.DataFrame({
+        "product_name": ["Classic", "Classic", "Berry"],
+        "price_unit_inr": [100, 120, 80],
+    })
+    result = product_performance(data)
+    assert result.loc[0, "product"] == "Classic"
+    assert result.loc[0, "records"] == 2
+    assert result.loc[0, "value"] == 2
+    assert result.loc[0, "average_price"] == 110
+
+
+def test_monthly_activity_forecast_returns_actual_and_projection():
+    data = pd.DataFrame({
+        "date": pd.to_datetime(["2024-01-01", "2024-02-01", "2024-02-15"]),
+    })
+    metric, result = monthly_activity_forecast(data, periods=1)
+    assert metric == "record_activity"
+    assert result["actual"].notna().sum() == 2
+    assert result["predicted"].notna().sum() == 1
